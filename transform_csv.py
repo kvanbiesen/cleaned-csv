@@ -240,7 +240,26 @@ def parse_product_entry(lines: List[str]) -> Optional[Dict[str, str]]:
     if 'generic' in text.lower() or 'no item number' in text.lower():
         notes.append('Generic product - no specific item code')
     
-    product['Notes'] = '; '.join(notes) if notes else ''
+    # Deduplicate notes and remove coating info if it's already in the coating field
+    deduplicated_notes = []
+    for note in notes:
+        # Skip if this note is just the coating repeated
+        if product['Coating'] and note.lower().strip() == product['Coating'].lower().strip():
+            continue
+        # Skip if note is substring of another note or vice versa
+        is_duplicate = False
+        for existing_note in deduplicated_notes:
+            if note.lower() in existing_note.lower() or existing_note.lower() in note.lower():
+                # Keep the longer, more descriptive one
+                if len(note) > len(existing_note):
+                    deduplicated_notes.remove(existing_note)
+                else:
+                    is_duplicate = True
+                break
+        if not is_duplicate:
+            deduplicated_notes.append(note)
+    
+    product['Notes'] = '; '.join(deduplicated_notes) if deduplicated_notes else ''
     
     # Skip entries that don't have enough information
     if not product['Product Type'] and not product['Item Number']:
